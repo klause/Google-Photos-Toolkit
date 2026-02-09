@@ -19,6 +19,7 @@ const actions: Action[] = [
   { elementId: 'lock' },
   { elementId: 'unLock' },
   { elementId: 'copyDescFromOther' },
+  { elementId: 'setDateFromFilename' },
 ];
 
 function userConfirmation(action: Action, filter: Filter): boolean {

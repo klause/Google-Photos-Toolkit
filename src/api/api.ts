@@ -842,21 +842,19 @@ export default class Api {
   }
 
   /**
-   * Change the date/time of a media item.
+   * Change the date/time of media items in bulk.
    *
-   * @param dedupKey - The dedup key of the item.
-   * @param timestamp - New timestamp in epoch milliseconds.
-   * @param timezone - Timezone offset (e.g. `19800` for GMT+05:30).
+   * @param items - Array of items to update, each with dedupKey, timestamp (seconds), and timezone (seconds).
    * @returns The API response.
    */
-  async setItemTimestamp(dedupKey: string, timestamp: number, timezone: number): Promise<any> {
+  async setItemsTimestamp(items: Array<{ dedupKey: string; timestampSec: number; timezoneSec: number }>): Promise<any> {
     const rpcid = 'DaSgWe';
-    const requestData = [[[dedupKey, timestamp, timezone]]];
+    const requestData = [items.map((item) => [item.dedupKey, item.timestampSec, item.timezoneSec])];
     try {
       const response = await this.makeApiRequest(rpcid, requestData);
       return response;
     } catch (error) {
-      console.error('Error in setItemTimestamp:', error);
+      console.error('Error in setItemsTimestamp:', error);
       throw error;
     }
   }

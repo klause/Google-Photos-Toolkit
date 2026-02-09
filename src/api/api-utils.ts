@@ -2,6 +2,7 @@ import Api from './api';
 import log from '../ui/logic/log';
 import splitArrayIntoChunks from '../utils/splitArrayIntoChunks';
 import { apiSettingsDefault } from './api-utils-default-presets';
+import { parseDateFromFilename, formatParsedDate } from '../utils/parseDateFromFilename';
 import type { MediaItem, Album, SharedLink, ApiSettings, PaginatedPage, ItemInfoExt, BulkMediaInfo } from '../types';
 import type Core from '../gptk-core';
 
@@ -471,5 +472,106 @@ export default class ApiUtils {
       mediaItems
     );
     log(`Copied ${results.filter(Boolean).length} descriptions from 'Other' field`);
+  }
+
+  /**
+   * Set the date/time of media items based on dates parsed from their filenames.
+   * Uses exiftool-style date parsing algorithm:
+   * - Looks for 4 consecutive digits as year (YYYY)
+   * - Followed by 2 digits each for month, day, hour, minute, second
+   * - Separator-agnostic (works with -, _, /, or no separator)
+   *
+   * Useful for screenshots or bulk-uploaded photos that have the date
+   * in the filename but not in the embedded EXIF metadata.
+   *
+   * @param mediaItems - Array of media items to process.
+   *
+   * @example
+   * // Supported filename formats:
+   * // IMG_20230515_143022.jpg → 2023-05-15 14:30:22
+   * // Screenshot_2023-05-15-14-30-22.png → 2023-05-15 14:30:22
+   * // photo_20230515.jpg → 2023-05-15 00:00:00
+   * // 2023_05_15_photo.jpg → 2023-05-15 00:00:00
+   */
+  async setTimestampFromFilename(mediaItems: MediaItem[]): Promise<void> {
+    log(`Processing ${mediaItems.length} items to set dates from filenames`);
+
+    // Fetch filenames and timezone offsets in bulk
+    const mediaInfoData = await this.getBatchMediaInfoChunked(mediaItems);
+
+    // Create a map for quick lookup
+    const infoByKey = new Map(mediaInfoData.map((info) => [info.mediaKey, info]));
+
+    // Merge bulk info into media items
+    const itemsWithInfo = mediaItems.map((item) => {
+      const info = infoByKey.get(item.mediaKey);
+      return {
+        ...item,
+        fileName: info?.fileName,
+        timezoneOffset: info?.timezoneOffset ?? item.timezoneOffset,
+      };
+    });
+
+    // Build list of items with parseable dates
+    const itemsToUpdate: Array<{
+      dedupKey: string;
+      timestampSec: number;
+      timezoneSec: number;
+      fileName: string;
+      formattedDate: string;
+    }> = [];
+
+    for (const item of itemsWithInfo) {
+      if (!item.fileName) continue;
+
+      const parsedDate = parseDateFromFilename(item.fileName);
+      if (!parsedDate) continue;
+
+      // Convert timestamp from milliseconds to seconds
+      const timestampSec = Math.floor(parsedDate.timestamp / 1000);
+
+      // Convert timezone offset from milliseconds to seconds (or default to 0)
+      const timezoneSec = item.timezoneOffset
+        ? Math.floor(item.timezoneOffset / 1000)
+        : 0;
+
+      itemsToUpdate.push({
+        dedupKey: item.dedupKey,
+        timestampSec,
+        timezoneSec,
+        fileName: item.fileName,
+        formattedDate: formatParsedDate(parsedDate),
+      });
+    }
+
+    if (itemsToUpdate.length === 0) {
+      log('No items with parseable dates in filenames');
+      return;
+    }
+
+    log(`Found ${itemsToUpdate.length} items with parseable dates in filenames`);
+
+    // Process in chunks using the bulk API
+    const chunks = splitArrayIntoChunks(itemsToUpdate, this.operationSize);
+    let successCount = 0;
+
+    for (const chunk of chunks) {
+      if (!this.core.isProcessRunning) break;
+
+      try {
+        await this.api.setItemsTimestamp(chunk);
+        successCount += chunk.length;
+
+        // Log each item that was updated
+        for (const item of chunk) {
+          log(`Set date for "${item.fileName}" to ${item.formattedDate}`);
+        }
+      } catch (error) {
+        console.error('Error setting timestamps for chunk:', error);
+        // Continue with next chunk
+      }
+    }
+
+    log(`Successfully set dates for ${successCount} of ${itemsToUpdate.length} items`);
   }
 }
