@@ -22,6 +22,11 @@ const actions: Action[] = [
   { elementId: 'setDateFromFilename' },
 ];
 
+// Actions that modify data irreversibly and require an extra warning
+const destructiveActions: Record<string, string> = {
+  setDateFromFilename: 'WARNING: This will overwrite the original photo dates. This action cannot be undone!',
+};
+
 function userConfirmation(action: Action, filter: Filter): boolean {
   function generateWarning(action: Action, filter: Filter): string {
     const filterDescription = generateFilterDescription(filter);
@@ -33,6 +38,13 @@ function userConfirmation(action: Action, filter: Filter): boolean {
     warning.push(`\nSource: ${sourceHuman}`);
     warning.push(`\n${filterDescription}`);
     warning.push(`\nAction: ${actionElement?.title ?? action.elementId}`);
+
+    // Add extra warning for destructive actions
+    const destructiveWarning = destructiveActions[action.elementId];
+    if (destructiveWarning) {
+      warning.push(`\n\n${destructiveWarning}`);
+    }
+
     return warning.join(' ');
   }
   const warning = generateWarning(action, filter);
