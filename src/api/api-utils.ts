@@ -1,5 +1,5 @@
 import Api from './api';
-import log from '../ui/logic/log';
+import log, { logLink } from '../ui/logic/log';
 import splitArrayIntoChunks from '../utils/splitArrayIntoChunks';
 import { apiSettingsDefault } from './api-utils-default-presets';
 import { parseDateFromFilename, formatParsedDate } from '../utils/parseDateFromFilename';
@@ -573,5 +573,21 @@ export default class ApiUtils {
     }
 
     log(`Successfully set dates for ${successCount} of ${itemsToUpdate.length} items`);
+  }
+
+  async listFilenames(mediaItems: MediaItem[]): Promise<void> {
+    log(`Fetching filenames for ${mediaItems.length} items`);
+    const mediaInfoData = await this.getBatchMediaInfoChunked(mediaItems);
+    const infoByKey = new Map(mediaInfoData.map((info) => [info.mediaKey, info]));
+    const filenames: string[] = [];
+    for (const item of mediaItems) {
+      const fileName = infoByKey.get(item.mediaKey)?.fileName ?? '(unknown)';
+      log(fileName);
+      filenames.push(fileName);
+    }
+    log(`Listed ${mediaItems.length} filenames`);
+    const blob = new Blob([filenames.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    logLink(url, 'filenames.txt', `Download filenames.txt (${filenames.length} files)`);
   }
 }

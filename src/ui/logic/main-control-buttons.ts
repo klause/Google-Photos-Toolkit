@@ -14,6 +14,11 @@ function clearLog(): void {
   if (logContainer) {
     const logElements = Array.from(logContainer.childNodes);
     for (const logElement of logElements) {
+      if (logElement instanceof Element) {
+        for (const a of logElement.querySelectorAll<HTMLAnchorElement>('a[href^="blob:"]')) {
+          URL.revokeObjectURL(a.href);
+        }
+      }
       logElement.remove();
     }
   }

@@ -20,6 +20,7 @@ const actions: Action[] = [
   { elementId: 'unLock' },
   { elementId: 'copyDescFromOther' },
   { elementId: 'setDateFromFilename' },
+  { elementId: 'listFilenames' },
 ];
 
 // Actions that modify data irreversibly and require an extra warning

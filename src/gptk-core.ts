@@ -59,6 +59,7 @@ export default class Core {
       unFavorite: async (p) => this.apiUtils.unFavorite(p.mediaItems),
       copyDescFromOther: async (p) => this.apiUtils.copyDescriptionFromOther(p.mediaItems),
       setDateFromFilename: async (p) => this.apiUtils.setTimestampFromFilename(p.mediaItems),
+      listFilenames: async (p) => this.apiUtils.listFilenames(p.mediaItems),
     };
   }
 
